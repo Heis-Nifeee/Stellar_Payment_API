@@ -7,6 +7,7 @@ import {
   useMerchantApiKey,
   useMerchantHydrated,
 } from "@/lib/merchant-store";
+import PullToRefresh from "react-simple-pull-to-refresh";
 
 interface Payment {
   id: string;
@@ -58,63 +59,56 @@ export default function RecentPayments() {
 
   useHydrateMerchantStore();
 
+  const fetchPayments = async (signal?: AbortSignal) => {
+    try {
+      if (!apiKey) {
+        setError("API key not found. Please register or log in.");
+        setLoading(false);
+        return;
+      }
+
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: LIMIT.toString(),
+      });
+
+      if (filters.search) params.append("search", filters.search);
+      if (filters.status !== "all") params.append("status", filters.status);
+      if (filters.asset !== "all") params.append("asset", filters.asset);
+      if (filters.dateFrom) params.append("date_from", filters.dateFrom);
+      if (filters.dateTo) params.append("date_to", filters.dateTo);
+
+      const response = await fetch(
+        `${apiUrl}/api/payments?${params.toString()}`,
+        {
+          headers: { "x-api-key": apiKey },
+          signal,
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to fetch payments");
+
+      const data: PaginatedResponse = await response.json();
+      setPayments(data.payments ?? []);
+      setTotalPages(data.total_pages ?? 1);
+      setTotalCount(data.total_count ?? 0);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
+      setError(err instanceof Error ? err.message : "Failed to load payments");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   useEffect(() => {
     if (!hydrated) return;
 
     const controller = new AbortController();
-
-    const fetchPayments = async () => {
-      try {
-        if (!apiKey) {
-          setError("API key not found. Please register or log in.");
-          setLoading(false);
-          return;
-        }
-
-        const apiUrl =
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-        
-        // Build query params
-        const params = new URLSearchParams({
-          page: page.toString(),
-          limit: LIMIT.toString(),
-        });
-        
-        if (filters.search) params.append("search", filters.search);
-        if (filters.status !== "all") params.append("status", filters.status);
-        if (filters.asset !== "all") params.append("asset", filters.asset);
-        if (filters.dateFrom) params.append("date_from", filters.dateFrom);
-        if (filters.dateTo) params.append("date_to", filters.dateTo);
-
-        const response = await fetch(
-          `${apiUrl}/api/payments?${params.toString()}`,
-          {
-            headers: {
-              "x-api-key": apiKey,
-            },
-            signal: controller.signal,
-          },
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch payments");
-        }
-
-        const data: PaginatedResponse = await response.json();
-        setPayments(data.payments ?? []);
-        setTotalPages(data.total_pages ?? 1);
-        setTotalCount(data.total_count ?? 0);
-      } catch (err: unknown) {
-        if (err instanceof Error && err.name === "AbortError") return;
-        setError(
-          err instanceof Error ? err.message : "Failed to load payments",
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPayments();
+    fetchPayments(controller.signal);
 
     return () => controller.abort();
   }, [apiKey, page, hydrated, filters]);
@@ -364,7 +358,11 @@ export default function RecentPayments() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <PullToRefresh
+    onRefresh={async () => {
+      await fetchPayments();
+    }}>
+<div className="flex flex-col gap-4">
       {/* Search and Filters */}
       <div className="rounded-xl border border-white/10 bg-white/5 p-4">
         <div className="flex flex-col gap-4">
@@ -471,7 +469,7 @@ export default function RecentPayments() {
           {hasActiveFilters && (
             <div className="flex flex-wrap items-center gap-2 pt-2">
               <span className="text-xs text-slate-400">Active filters:</span>
-              
+
               {filters.search && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-mint/30 bg-mint/10 px-3 py-1 text-xs text-mint">
                   Search: &quot;{filters.search}&quot;
@@ -597,11 +595,10 @@ export default function RecentPayments() {
               >
                 <td className="px-4 py-3">
                   <span
-                    className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      payment.status === "confirmed"
+                    className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${payment.status === "confirmed"
                         ? "bg-green-500/20 text-green-400"
                         : "bg-yellow-500/20 text-yellow-400"
-                    }`}
+                      }`}
                   >
                     {payment.status}
                   </span>
@@ -638,5 +635,7 @@ export default function RecentPayments() {
         onClose={closeModal}
       />
     </div>
+    </PullToRefresh>
+    
   );
 }

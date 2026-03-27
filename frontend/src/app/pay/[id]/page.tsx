@@ -188,6 +188,7 @@ export default function PaymentPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [walletReady, setWalletReady] = useState(false);
+  const [showRawIntent, setShowRawIntent] = useState(false);
 
   const { activeProvider } = useWallet();
   const { isProcessing, status: txStatus, error: paymentError, processPayment } = usePayment(activeProvider);
@@ -197,52 +198,52 @@ export default function PaymentPage() {
     "Test SDF Network ; September 2015";
 
   // ── Fetch payment details ──────────────────────────────────────────────────
-  useEffect(() => {
-    const controller = new AbortController();
+  // useEffect(() => {
+  //   const controller = new AbortController();
 
-    const load = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/payment-status/${paymentId}`, {
-          signal: controller.signal,
-        });
-        if (res.status === 404) throw new Error("Payment not found.");
-        if (!res.ok) throw new Error("Could not load payment details.");
-        const data = await res.json();
-        setPayment(data.payment);
-      } catch (err: unknown) {
-        if (err instanceof Error && err.name === "AbortError") return;
-        setFetchError(err instanceof Error ? err.message : "Failed to load payment.");
-      } finally {
-        setLoading(false);
-      }
-    };
+  //   const load = async () => {
+  //     try {
+  //       const res = await fetch(`${API_URL}/api/payment-status/${paymentId}`, {
+  //         signal: controller.signal,
+  //       });
+  //       if (res.status === 404) throw new Error("Payment not found.");
+  //       if (!res.ok) throw new Error("Could not load payment details.");
+  //       const data = await res.json();
+  //       setPayment(data.payment);
+  //     } catch (err: unknown) {
+  //       if (err instanceof Error && err.name === "AbortError") return;
+  //       setFetchError(err instanceof Error ? err.message : "Failed to load payment.");
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
 
-    load();
-    return () => controller.abort();
-  }, [paymentId]);
+  //   load();
+  //   return () => controller.abort();
+  // }, [paymentId]);
 
   // ── Poll until settled ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (loading || !payment) return;
-    const settled = ["confirmed", "completed", "failed"].includes(payment.status);
-    if (settled) return;
+  // useEffect(() => {
+  //   if (loading || !payment) return;
+  //   const settled = ["confirmed", "completed", "failed"].includes(payment.status);
+  //   if (settled) return;
 
-    const id = setInterval(async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/payment-status/${paymentId}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.payment) setPayment(data.payment);
-      } catch { /* silent — retry next tick */ }
-    }, 5000);
+  //   const id = setInterval(async () => {
+  //     try {
+  //       const res = await fetch(`${API_URL}/api/payment-status/${paymentId}`);
+  //       if (!res.ok) return;
+  //       const data = await res.json();
+  //       if (data.payment) setPayment(data.payment);
+  //     } catch { /* silent — retry next tick */ }
+  //   }, 5000);
 
-    return () => clearInterval(id);
-  }, [paymentId, payment, loading]);
+  //   return () => clearInterval(id);
+  // }, [paymentId, payment, loading]);
 
-  // ── Wallet readiness ───────────────────────────────────────────────────────
-  useEffect(() => {
-    setWalletReady(!!activeProvider);
-  }, [activeProvider]);
+  // // ── Wallet readiness ───────────────────────────────────────────────────────
+  // useEffect(() => {
+  //   setWalletReady(!!activeProvider);
+  // }, [activeProvider]);
 
   // ── Pay handler ───────────────────────────────────────────────────────────
   const handlePay = async () => {
